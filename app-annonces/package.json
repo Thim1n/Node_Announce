@@ -1,0 +1,32 @@
+{
+  "name": "app-annonces",
+  "version": "1.0.0",
+  "description": "Annonces en ligne",
+  "license": "ISC",
+  "author": "Thibaud",
+  "type": "commonjs",
+  "main": "src/apps.js",
+  "scripts": {
+    "dev": "nodemon src/apps.js",
+    "start": "node src/apps.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^5.2.1",
+    "express-rate-limit": "^7.1.5",
+    "express-validator": "^7.3.1",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.9.1",
+    "nodemailer": "^6.9.9",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.0",
+    "yamljs": "^0.3.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
+  }
+}

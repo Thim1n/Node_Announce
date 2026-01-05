@@ -1,0 +1,998 @@
+openapi: 3.0.0
+info:
+  title: API Plateforme d'Annonces
+  license:
+    name: ISC
+
+servers:
+  - url: http://localhost:3000/api
+    description: Serveur de développement
+  - url: https://api.annonces.com/api
+    description: Serveur de production
+
+tags:
+  - name: Authentification
+    description: Gestion de l'authentification et des profils utilisateurs
+  - name: Annonces
+    description: CRUD et consultation des annonces
+  - name: Administration
+    description: Routes réservées aux administrateurs
+  - name: Signalements
+    description: Système de signalement d'annonces
+  - name: Système
+    description: Routes système et santé de l'API
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token JWT obtenu après connexion
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        nom:
+          type: string
+          example: "Jean Dupont"
+        email:
+          type: string
+          format: email
+          example: "jean@example.com"
+        role:
+          type: string
+          enum: [annonceur, acheteur, administrateur]
+          example: "annonceur"
+        created_at:
+          type: string
+          format: date-time
+
+    Annonce:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        titre:
+          type: string
+          minLength: 3
+          maxLength: 100
+          example: "MacBook Pro 2020"
+        description:
+          type: string
+          minLength: 10
+          maxLength: 1000
+          example: "Excellent état, 16GB RAM, 512GB SSD"
+        prix:
+          type: number
+          format: float
+          minimum: 0
+          example: 1200.00
+        categorie:
+          type: string
+          example: "Informatique"
+        statut:
+          type: string
+          enum: [visible, non-visible]
+          example: "visible"
+        user_id:
+          type: integer
+          example: 2
+        annonceur_nom:
+          type: string
+          example: "Jean Dupont"
+        annonceur_email:
+          type: string
+          example: "jean@example.com"
+        commentaire_admin:
+          type: string
+          nullable: true
+          example: null
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Signalement:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        message:
+          type: string
+          example: "Cette annonce contient des informations incorrectes"
+        annonce_id:
+          type: integer
+          example: 5
+        annonce_titre:
+          type: string
+          example: "MacBook Pro 2020"
+        statut:
+          type: string
+          enum: [nouveau, traite, rejete]
+          example: "nouveau"
+        created_at:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Erreur de validation"
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              msg:
+                type: string
+              param:
+                type: string
+              location:
+                type: string
+
+    Stats:
+      type: object
+      properties:
+        annonces:
+          type: object
+          properties:
+            visible:
+              type: integer
+              example: 45
+            non-visible:
+              type: integer
+              example: 5
+            total:
+              type: integer
+              example: 50
+        users:
+          type: object
+          properties:
+            total:
+              type: integer
+              example: 25
+            annonceurs:
+              type: integer
+              example: 20
+            acheteurs:
+              type: integer
+              example: 4
+            administrateurs:
+              type: integer
+              example: 1
+
+paths:
+  /health:
+    get:
+      tags:
+        - Système
+      summary: Vérifier l'état de l'API
+      description: Route de santé pour vérifier que l'API fonctionne correctement
+      responses:
+        '200':
+          description: API fonctionnelle
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "OK"
+                  message:
+                    type: string
+                    example: "Server is running"
+                  timestamp:
+                    type: string
+                    format: date-time
+                  environment:
+                    type: string
+                    example: "development"
+
+  /auth/register:
+    post:
+      tags:
+        - Authentification
+      summary: Inscription d'un nouvel utilisateur
+      description: Créer un nouveau compte utilisateur (annonceur ou acheteur)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - nom
+                - email
+                - password
+              properties:
+                nom:
+                  type: string
+                  minLength: 2
+                  maxLength: 100
+                  example: "Jean Dupont"
+                email:
+                  type: string
+                  format: email
+                  example: "jean@example.com"
+                password:
+                  type: string
+                  minLength: 6
+                  example: "motdepasse123"
+                role:
+                  type: string
+                  enum: [annonceur, acheteur]
+                  default: annonceur
+                  example: "annonceur"
+      responses:
+        '201':
+          description: Utilisateur créé avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Utilisateur créé avec succès"
+                  token:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  user:
+                    $ref: '#/components/schemas/User'
+        '400':
+          description: Erreur de validation ou email déjà utilisé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/login:
+    post:
+      tags:
+        - Authentification
+      summary: Connexion d'un utilisateur
+      description: Authentifier un utilisateur et obtenir un token JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "jean@example.com"
+                password:
+                  type: string
+                  example: "motdepasse123"
+      responses:
+        '200':
+          description: Connexion réussie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Connexion réussie"
+                  token:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Identifiants incorrects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Email ou mot de passe incorrect"
+
+  /auth/me:
+    get:
+      tags:
+        - Authentification
+      summary: Récupérer son profil
+      description: Obtenir les informations de l'utilisateur connecté
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Profil utilisateur
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Non authentifié
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Token manquant"
+
+  /auth/update-profile:
+    put:
+      tags:
+        - Authentification
+      summary: Mettre à jour son profil
+      description: Modifier les informations de son compte
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nom:
+                  type: string
+                  minLength: 2
+                  maxLength: 100
+                  example: "Jean Martin"
+                email:
+                  type: string
+                  format: email
+                  example: "jean.martin@example.com"
+                password:
+                  type: string
+                  minLength: 6
+                  example: "nouveaumotdepasse"
+      responses:
+        '200':
+          description: Profil mis à jour
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Profil mis à jour avec succès"
+        '400':
+          description: Erreur de validation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Non authentifié
+
+  /annonces:
+    get:
+      tags:
+        - Annonces
+      summary: Lister les annonces publiques
+      description: Récupérer toutes les annonces visibles avec filtres optionnels
+      parameters:
+        - name: categorie
+          in: query
+          description: Filtrer par catégorie
+          required: false
+          schema:
+            type: string
+            example: "Informatique"
+        - name: search
+          in: query
+          description: Rechercher dans titre et description
+          required: false
+          schema:
+            type: string
+            example: "macbook"
+      responses:
+        '200':
+          description: Liste des annonces
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Liste des annonces"
+                  count:
+                    type: integer
+                    example: 10
+                  annonces:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Annonce'
+
+    post:
+      tags:
+        - Annonces
+      summary: Créer une annonce
+      description: Publier une nouvelle annonce (authentification requise)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - titre
+                - description
+                - prix
+              properties:
+                titre:
+                  type: string
+                  minLength: 3
+                  maxLength: 100
+                  example: "Vélo de montagne"
+                description:
+                  type: string
+                  minLength: 10
+                  maxLength: 1000
+                  example: "VTT en excellent état, peu utilisé, toutes options"
+                prix:
+                  type: number
+                  format: float
+                  minimum: 0
+                  example: 450.00
+                categorie:
+                  type: string
+                  example: "Sports"
+      responses:
+        '201':
+          description: Annonce créée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Annonce créée avec succès"
+                  annonceId:
+                    type: integer
+                    example: 15
+        '400':
+          description: Erreur de validation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Non authentifié
+
+  /annonces/categories:
+    get:
+      tags:
+        - Annonces
+      summary: Liste des catégories
+      description: Récupérer toutes les catégories d'annonces disponibles
+      responses:
+        '200':
+          description: Liste des catégories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Liste des catégories"
+                  categories:
+                    type: array
+                    items:
+                      type: string
+                    example: ["Informatique", "Sports", "Meubles", "Véhicules"]
+
+  /annonces/mes-annonces:
+    get:
+      tags:
+        - Annonces
+      summary: Mes annonces
+      description: Récupérer toutes les annonces de l'utilisateur connecté
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Liste de mes annonces
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Mes annonces"
+                  count:
+                    type: integer
+                    example: 5
+                  annonces:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Annonce'
+        '401':
+          description: Non authentifié
+
+  /annonces/{id}:
+    get:
+      tags:
+        - Annonces
+      summary: Détails d'une annonce
+      description: Récupérer les détails d'une annonce spécifique
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID de l'annonce
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: Détails de l'annonce
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Détails de l'annonce"
+                  annonce:
+                    $ref: '#/components/schemas/Annonce'
+        '404':
+          description: Annonce non trouvée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Annonce non trouvée"
+
+    put:
+      tags:
+        - Annonces
+      summary: Modifier une annonce
+      description: Modifier sa propre annonce (propriétaire uniquement)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID de l'annonce
+          schema:
+            type: integer
+            example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                titre:
+                  type: string
+                  minLength: 3
+                  maxLength: 100
+                  example: "Vélo de montagne - Prix réduit"
+                description:
+                  type: string
+                  minLength: 10
+                  maxLength: 1000
+                  example: "VTT en excellent état, peu utilisé, prix négociable"
+                prix:
+                  type: number
+                  format: float
+                  minimum: 0
+                  example: 400.00
+                categorie:
+                  type: string
+                  example: "Sports"
+      responses:
+        '200':
+          description: Annonce mise à jour
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Annonce mise à jour avec succès"
+        '403':
+          description: Accès refusé (pas le propriétaire)
+        '404':
+          description: Annonce non trouvée
+        '401':
+          description: Non authentifié
+
+    delete:
+      tags:
+        - Annonces
+      summary: Supprimer une annonce
+      description: Supprimer sa propre annonce (propriétaire uniquement)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID de l'annonce
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: Annonce supprimée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Annonce supprimée avec succès"
+        '403':
+          description: Accès refusé (pas le propriétaire)
+        '404':
+          description: Annonce non trouvée
+        '401':
+          description: Non authentifié
+
+  /signalements:
+    post:
+      tags:
+        - Signalements
+      summary: Signaler une annonce
+      description: Créer un signalement pour une annonce problématique
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - message
+                - annonce_id
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "user@example.com"
+                message:
+                  type: string
+                  minLength: 10
+                  maxLength: 1000
+                  example: "Cette annonce contient des informations incorrectes"
+                annonce_id:
+                  type: integer
+                  minimum: 1
+                  example: 5
+      responses:
+        '201':
+          description: Signalement créé
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Signalement enregistré avec succès. L'administrateur sera notifié."
+                  signalementId:
+                    type: integer
+                    example: 1
+        '400':
+          description: Erreur de validation
+        '404':
+          description: Annonce non trouvée
+
+    get:
+      tags:
+        - Signalements
+      summary: Liste des signalements (Admin)
+      description: Récupérer tous les signalements (administrateur uniquement)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: statut
+          in: query
+          description: Filtrer par statut
+          required: false
+          schema:
+            type: string
+            enum: [nouveau, traite, rejete]
+            example: "nouveau"
+        - name: annonce_id
+          in: query
+          description: Filtrer par annonce
+          required: false
+          schema:
+            type: integer
+            example: 5
+      responses:
+        '200':
+          description: Liste des signalements
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Liste des signalements"
+                  count:
+                    type: integer
+                    example: 3
+                  signalements:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Signalement'
+        '401':
+          description: Non authentifié
+        '403':
+          description: Accès refusé (non administrateur)
+
+  /signalements/{id}/statut:
+    patch:
+      tags:
+        - Signalements
+      summary: Modifier statut signalement (Admin)
+      description: Changer le statut d'un signalement (administrateur uniquement)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID du signalement
+          schema:
+            type: integer
+            example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - statut
+              properties:
+                statut:
+                  type: string
+                  enum: [nouveau, traite, rejete]
+                  example: "traite"
+      responses:
+        '200':
+          description: Statut modifié
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Statut du signalement mis à jour avec succès"
+                  new_statut:
+                    type: string
+                    example: "traite"
+        '404':
+          description: Signalement non trouvé
+        '401':
+          description: Non authentifié
+        '403':
+          description: Accès refusé
+
+  /admin/annonces:
+    get:
+      tags:
+        - Administration
+      summary: Toutes les annonces (Admin)
+      description: Récupérer toutes les annonces, même non visibles (administrateur uniquement)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: query
+          description: Filtrer par utilisateur
+          required: false
+          schema:
+            type: integer
+            example: 2
+        - name: statut
+          in: query
+          description: Filtrer par statut
+          required: false
+          schema:
+            type: string
+            enum: [visible, non-visible]
+            example: "visible"
+        - name: categorie
+          in: query
+          description: Filtrer par catégorie
+          required: false
+          schema:
+            type: string
+            example: "Informatique"
+        - name: search
+          in: query
+          description: Rechercher
+          required: false
+          schema:
+            type: string
+            example: "macbook"
+      responses:
+        '200':
+          description: Liste de toutes les annonces
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Liste de toutes les annonces"
+                  count:
+                    type: integer
+                    example: 50
+                  annonces:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Annonce'
+        '401':
+          description: Non authentifié
+        '403':
+          description: Accès refusé (non administrateur)
+
+  /admin/annonces/{id}/statut:
+    patch:
+      tags:
+        - Administration
+      summary: Modifier statut annonce (Admin)
+      description: Changer le statut d'une annonce et ajouter un commentaire (administrateur uniquement)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID de l'annonce
+          schema:
+            type: integer
+            example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - statut
+              properties:
+                statut:
+                  type: string
+                  enum: [visible, non-visible]
+                  example: "non-visible"
+                commentaire_admin:
+                  type: string
+                  example: "Annonce non conforme aux règles de la plateforme"
+      responses:
+        '200':
+          description: Statut modifié
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Statut de l'annonce mis à jour avec succès"
+                  new_statut:
+                    type: string
+                    example: "non-visible"
+                  commentaire_admin:
+                    type: string
+                    example: "Annonce non conforme aux règles de la plateforme"
+        '404':
+          description: Annonce non trouvée
+        '401':
+          description: Non authentifié
+        '403':
+          description: Accès refusé
+
+  /admin/users:
+    get:
+      tags:
+        - Administration
+      summary: Liste des utilisateurs (Admin)
+      description: Récupérer tous les utilisateurs (administrateur uniquement)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: role
+          in: query
+          description: Filtrer par rôle
+          required: false
+          schema:
+            type: string
+            enum: [annonceur, acheteur, administrateur]
+            example: "annonceur"
+      responses:
+        '200':
+          description: Liste des utilisateurs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Liste des utilisateurs"
+                  count:
+                    type: integer
+                    example: 25
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+        '401':
+          description: Non authentifié
+        '403':
+          description: Accès refusé
+
+  /admin/stats:
+    get:
+      tags:
+        - Administration
+      summary: Statistiques (Admin)
+      description: Récupérer les statistiques de la plateforme (administrateur uniquement)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Statistiques
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Statistiques de la plateforme"
+                  stats:
+                    $ref: '#/components/schemas/Stats'
+        '401':
+          description: Non authentifié
+        '403':
+          description: Accès refusé
