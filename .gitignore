@@ -1,0 +1,13 @@
+target/
+.idea
+.mvn
+
+
+db-data
+.npm
+package-lock.json
+node_modules
+.env
+
+docker-compose.yml
+Dockerfile

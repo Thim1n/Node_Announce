@@ -1,0 +1,32 @@
+{
+  "name": "app-annonces",
+  "version": "1.0.0",
+  "description": "Annonces en ligne",
+  "license": "TH",
+  "author": "Thibaud",
+  "type": "commonjs",
+  "main": "src/apps.js",
+  "scripts": {
+    "start": "node src/apps.js",
+    "test": "jest",
+    "dev": "nodemon src/apps.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "express-validator": "^7.3.1",
+    "helmet": "^8.1.0",
+    "jest": "^30.2.0",
+    "jsonwebtoken": "^9.0.3",
+    "mariadb": "^3.1.1",
+    "nodemailer": "^7.0.12",
+    "sequelize": "^6.37.7",
+    "supertest": "^7.2.2"
+  },
+  "devDependencies": {
+    "sequelize-cli": "^6.6.5",
+    "sqlite3": "^5.1.7"
+  }
+}
